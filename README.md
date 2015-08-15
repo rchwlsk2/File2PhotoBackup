@@ -1,2 +1,2 @@
-# File2PhotoBackup
+# StenoDrive
 Converts files to photos for a backup in Google Photos

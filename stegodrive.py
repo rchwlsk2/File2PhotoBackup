@@ -496,8 +496,8 @@ def resolveEncodedFiles():
             else:
                 builtpath = os.path.join(builtpath, directory)
 
-            if not os.path.exists(directory):
-                os.makedirs(directory)
+            if not os.path.exists(builtpath):
+                os.makedirs(builtpath)
 
         filepath = '/'.join(longpath)
         decode(filename, filepath)

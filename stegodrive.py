@@ -313,7 +313,7 @@ def downSync(client):
 def upSync(client, photo, rev):
     sourceFile = devertPath(photo.title.text)
     tempPath = os.path.join(tempName, sourceFile[-1])
-    encode(sourceFile, tempPath)
+    encode('/'.join(sourceFile), tempPath)
 
     albums = self.client.GetUserFeed()
     for album in albums.entry:

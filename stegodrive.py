@@ -225,18 +225,16 @@ def initDb():
     return False
 
 def addToDb(key, val, existsCheck):
-    with open(dbName, 'w+') as data_file:
-        try:
-            data = json.load(data_file)
-        except ValueError:
-            data = {}
+    with open(dbName, 'r') as data_file:
+        data = json.load(data_file)
 
-        if existsCheck:
-            if key not in data:
-                data[key] = val
-        else:
+    if existsCheck:
+        if key not in data:
             data[key] = val
+    else:
+        data[key] = val
 
+    with open(dbName, 'w') as data_file:
         json.dump(data, data_file)
 
 def delFromDb(key):

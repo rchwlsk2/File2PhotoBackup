@@ -86,7 +86,7 @@ class StenoDriveHandler(FileSystemEventHandler):
 
     def on_deleted(self, event):
         print 'File deleted', event.src_path
-        if os.path.isfile(event.src_path):
+        if not os.path.isdir(event.src_path):
             photoname = convertPath(event.src_path) + '.png'
 
             albums = self.client.GetUserFeed()
@@ -101,7 +101,7 @@ class StenoDriveHandler(FileSystemEventHandler):
                             delFromDb(photoname)
                             return
 
-        else:
+        else: 
             photostart = convertPath(event.src_path)
 
             albums = self.client.GetUserFeed()
@@ -225,44 +225,45 @@ def initDb():
     return False
 
 def addToDb(key, val, existsCheck):
-    with open(dbName, 'w+') as data_file:
+    with open(dbName, 'r') as data_file:
         try:
             data = json.load(data_file)
         except ValueError:
             data = {}
 
-        if existsCheck:
-            if key not in data:
-                data[key] = val
-        else:
+    if existsCheck:
+        if key not in data:
             data[key] = val
+    else:
+        data[key] = val
 
-        print data
+    with open(dbName, 'w') as data_file:
         json.dump(data, data_file)
 
 def delFromDb(key):
-    with open(dbName, 'w+') as data_file:
+    with open(dbName, 'r') as data_file:
         try:
             data = json.load(data_file)
         except ValueError:
             data = {}
 
-        if key in data:
-            del data[key]
+    if key in data:
+        del data[key]
 
+    with open(dbName, 'w') as data_file:
         json.dump(data, data_file)
 
 def getFromDb(key):
-    with open(dbName, 'w+') as data_file:
+    with open(dbName, 'r') as data_file:
         try:
             data = json.load(data_file)
         except ValueError:
             data = {}
 
-        if key in data:
-            return data[key]
+    if key in data:
+        return data[key]
 
-        return -1
+    return -1
 
 def updateLocalDb(client):
     albums = client.GetUserFeed()

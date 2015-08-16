@@ -27,14 +27,13 @@ import time
 # CONSTANTS
 ####################
 
-email = "stallionsunite@gmail.com"
-password = "StallionsFTW"
-username = "stallionsunite"
+email = ""
+password = ""
 
 secret = "config/client_secret_108601353483-fnbcbps0b9iunmaufrtvveft5o6ttb86.apps.googleusercontent.com.json"
 credentials = "config/creds.txt"
 
-albumName = "StenoDrive-DoNotDelete"
+albumName = "StegoDrive-DoNotDelete"
 folderName = "files"
 tempName = "temp"
 config = "config/config.json"
@@ -85,7 +84,6 @@ class StenoDriveHandler(FileSystemEventHandler):
                             self.client.Delete(photo)
                             return
 
-        # TODO: Add support for deleting folders (delete all files inside)
         else:
             photostart = convertPath(event.src_path)
 
@@ -331,20 +329,16 @@ def save_file(byte_array, output):
 
 
 ####################
-# METADATA
-####################
-
-def remove_metadata(image):
-    im = Image.open(image)
-    im.save("NOMETA"+image)
-
-
-
-####################
 # MAIN LOOP
 ####################
 
-def main():
+if __name__ == '__main__':
+    if len(sys.argv) != 3:
+        sys.exit("Usage: python stegodrive.py <email> <password>")
+
+    email = sys.argv[1]
+    password = sys.argv[2]
+
     client = OAuth2Login(secret, credentials, email)
     event_handler = StenoDriveHandler(client)
     observer = Observer()
@@ -365,6 +359,3 @@ def main():
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
-
-if __name__ == '__main__':
-    main()

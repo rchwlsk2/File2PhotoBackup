@@ -237,6 +237,7 @@ def addToDb(key, val, existsCheck):
         else:
             data[key] = val
 
+        print data
         json.dump(data, data_file)
 
 def delFromDb(key):
@@ -263,6 +264,17 @@ def getFromDb(key):
 
         return -1
 
+def updateLocalDb(client):
+    albums = client.GetUserFeed()
+    for album in albums.entry:
+        if album.title.text == albumName:
+            album_url = '/data/feed/api/user/default/albumid/%s' % album.gphoto_id.text
+            photos = client.GetFeed(album_url + '?kind=photo')
+
+            for photo in photos.entry:
+                tags = client.GetFeed('/data/feed/api/user/default/albumid/%s/photoid/%s?kind=tag' % (album.gphoto_id.text, photo.gphoto_id.text))
+                for entry in tags.entry:
+                      addToDb(photo.title.text, int(entry.title.text), False)
 
 
 ####################
@@ -274,6 +286,7 @@ def syncFolders(client):
     url = getZipUrl()
     downloadFromUrl(url)
     resolveEncodedFiles()
+    updateLocalDb(client)
     return
 
 
@@ -521,19 +534,6 @@ if __name__ == '__main__':
 
     client = OAuth2Login(secret, credentials, email)
 
-    if len(sys.argv) == 4:
-        if sys.argv[3] == '-u':
-            syncFolders(client)
-            sys.exit(0)
-
-    event_handler = StenoDriveHandler(client)
-    observer = Observer()
-
-    if not os.path.exists(folderName):
-        os.makedirs(folderName)
-    observer.schedule(event_handler, path=folderName, recursive=True)
-    observer.start()
-
     print 'Initializing photo album...'
     didMakeAlbum = initializeAlbum(client)
     if not didMakeAlbum:
@@ -547,6 +547,19 @@ if __name__ == '__main__':
         print 'DB already exists! Did not create a new one'
     else:
         print 'DB created :)'
+
+    if len(sys.argv) == 4:
+        if sys.argv[3] == '-u':
+            syncFolders(client)
+            sys.exit(0)
+
+    event_handler = StenoDriveHandler(client)
+    observer = Observer()
+
+    if not os.path.exists(folderName):
+        os.makedirs(folderName)
+    observer.schedule(event_handler, path=folderName, recursive=True)
+    observer.start()
 
     try:
         while True:

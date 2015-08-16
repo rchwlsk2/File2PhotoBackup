@@ -1,4 +1,0 @@
-sudo pip install ElementTree
-cd gdata-python-client
-sudo python install setup.py install
-./tests/all_tests.py

@@ -27,6 +27,8 @@ import os
 import math
 import time
 import json
+import shutil
+import zipfile
 
 
 
@@ -269,15 +271,9 @@ def getFromDb(key):
 
 # Adds all of the files in the folders to the db
 def syncFolders(client):
-    rows = ['files']
-    files = []
-    for folder in rows:
-        for root, directories, filenames in os.walk(folder):
-            for filename in filenames:
-                name = os.path.join(root,filename)
-                files.append(name)
-                addFile(client, name)
-
+    url = getZipUrl()
+    downloadFromUrl(url)
+    resolveEncodedFiles()
     return
 
 
@@ -292,6 +288,11 @@ def convertPath(path):
     safepath = '#'.join(pathlist)
     safepath += '#'
     return safepath
+
+# Changes a converted path to a list that can be followed like a directory traverse
+def devertPath(path):
+    pathlist = path.split('#')
+    return pathlist[:-1]
 
 # Gets all photos associated with a file and assembles it
 def getFile(client, filename):
@@ -405,9 +406,9 @@ def save_file(byte_array, output):
 def getZipUrl():
     driver = webdriver.Firefox()
     driver.get("https://photos.google.com/login")
-    email = driver.find_element_by_id("Email")
-    email.send_keys(email)
-    email.send_keys(Keys.RETURN)
+    emaild = driver.find_element_by_id("Email")
+    emaild.send_keys(email)
+    emaild.send_keys(Keys.RETURN)
     try:
         passwd = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.ID, "Passwd"))
@@ -462,6 +463,40 @@ def getZipUrl():
         driver.quit()
         return zip_url
 
+def downloadFromUrl(url):
+    (filename, headers) = urllib.urlretrieve(url)
+
+    fn = headers.dict['content-disposition']
+    fn = fn.split('filename=')[1];
+    fn = fn.strip('"')
+
+    zipname = os.path.join(tempName, fn)
+    shutil.move(filename, zipname)
+
+    if zipname.endswith('zip'):
+        with zipfile.ZipFile(zipname, "r") as z:
+            z.extractall(tempName)
+        os.remove(zipname)
+
+    return
+
+def resolveEncodedFiles():
+    files = os.listdir(tempName)
+    print files
+    for filename in files:
+        if filename == '.DS_Store':
+            continue
+        longpath = devertPath(filename)
+        filename = os.path.join(tempName, filename)
+
+        for directory in longpath[:-1]:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+        filepath = '/'.join(longpath)
+        decode(filename, filepath)
+        os.remove(filename)
+
 
 
 ####################
@@ -469,13 +504,18 @@ def getZipUrl():
 ####################
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 3:
         sys.exit("Usage: python stegodrive.py <email> <password>")
 
     email = sys.argv[1]
     password = sys.argv[2]
 
     client = OAuth2Login(secret, credentials, email)
+
+    if sys.argv[3] == '-u':
+        syncFolders(client)
+        sys.exit(0)
+
     event_handler = StenoDriveHandler(client)
     observer = Observer()
 
@@ -491,8 +531,6 @@ if __name__ == '__main__':
     didMakeJson = initDb()
     if not didMakeJson:
         print 'DB already exists! Did not create a new one'
-
-    syncFolders(client)
 
     try:
         while True:

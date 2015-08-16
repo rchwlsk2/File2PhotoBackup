@@ -265,6 +265,24 @@ def getFromDb(key):
 
     return -1
 
+def compareRevisions(client):
+    albums = client.GetUserFeed()
+    for album in albums.entry:
+        if album.title.text == albumName:
+            album_url = '/data/feed/api/user/default/albumid/%s' % album.gphoto_id.text
+            photos = client.GetFeed(album_url + '?kind=photo')
+
+            for photo in photos.entry:
+                tags = client.GetFeed('/data/feed/api/user/default/albumid/%s/photoid/%s?kind=tag' % (album.gphoto_id.text, photo.gphoto_id.text))
+                for entry in tags.entry:
+                    if getFromDb(photo.title.text) < int(entry.title.text):
+                        downSync(client)
+                        return
+                    elif getFromDb(photo.title.text) > int(entry.title.text):
+                        upSync(client, photo, entry)
+
+    return
+
 def updateLocalDb(client):
     albums = client.GetUserFeed()
     for album in albums.entry:
@@ -277,20 +295,40 @@ def updateLocalDb(client):
                 for entry in tags.entry:
                       addToDb(photo.title.text, int(entry.title.text), False)
 
+    return
+
 
 ####################
 # FOLDER MANAGEMENT
 ####################
 
 # Adds all of the files in the folders to the db
-def syncFolders(client):
+def downSync(client):
     url = getZipUrl()
     downloadFromUrl(url)
     resolveEncodedFiles()
     updateLocalDb(client)
     return
 
+def upSync(client, photo, rev):
+    sourceFile = devertPath(photo.title.text)
+    tempPath = os.path.join(tempName, sourceFile[-1])
+    encode(sourceFile, tempPath)
 
+    albums = self.client.GetUserFeed()
+    for album in albums.entry:
+        if album.title.text == albumName:
+            album_url = '/data/feed/api/user/default/albumid/%s' % album.gphoto_id.text
+            photo = client.InsertPhotoSimple(album_url, photo.title.text, 'StenoDrive: ' + photo.title.text, tempPath, content_type='image/jpeg')
+
+            if not photo.media.keywords:
+                photo.media.keywords = gdata.media.Keywords()
+            photo.media.keywords.text = str(rev)
+            client.UpdatePhotoMetadata(photo)
+
+    os.remove(tempPath)
+    return
+    
 
 #####################
 # FILE MANAGEMENT
@@ -551,7 +589,7 @@ if __name__ == '__main__':
 
     if len(sys.argv) == 4:
         if sys.argv[3] == '-u':
-            syncFolders(client)
+            downSync(client)
             sys.exit(0)
 
     event_handler = StenoDriveHandler(client)
@@ -564,7 +602,8 @@ if __name__ == '__main__':
 
     try:
         while True:
-            time.sleep(1)
+            time.sleep(5)
+            compareRevisions(client)
     except KeyboardInterrupt:
         observer.stop()
     observer.join()

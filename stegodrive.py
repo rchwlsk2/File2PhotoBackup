@@ -406,11 +406,7 @@ def fill_data(f, data):
 
 def save_img(data, output_name):
     img = Image.fromarray(data, 'RGBA')
-    try:
-        img.save(output_name)
-    except:
-        formatStart = output_name.index('.')
-        img.save(output_name, output_name[formatStart, -1])
+    img.save(output_name)
 
 
 

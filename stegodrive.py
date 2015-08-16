@@ -3,6 +3,12 @@ import gdata.media
 import gdata.geo
 import gdata.gauth
 
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+
 from datetime import datetime, timedelta
 from oauth2client.file import Storage
 from oauth2client.client import flow_from_clientsecrets
@@ -20,6 +26,7 @@ import sys
 import os
 import math
 import time
+import json
 
 
 
@@ -37,7 +44,7 @@ albumName = "StegoDrive-DoNotDelete"
 folderName = "files"
 tempName = "temp"
 config = "config/config.json"
-dbName = "config/filemap.db"
+dbName = "config/revisions.json"
 
 
 
@@ -55,7 +62,7 @@ class StenoDriveHandler(FileSystemEventHandler):
         if os.path.isdir(event.src_path) or event.src_path.endswith('.DS_Store'):
             return
 
-        outname = convertPath(event.src_path) + '.jpg'
+        outname = convertPath(event.src_path) + '.png'
         outpath = os.path.join(tempName, outname)
         encode(event.src_path, outpath)
 
@@ -65,13 +72,20 @@ class StenoDriveHandler(FileSystemEventHandler):
                 album_url = '/data/feed/api/user/default/albumid/%s' % album.gphoto_id.text
                 photo = self.client.InsertPhotoSimple(album_url, outname, 'StenoDrive: ' + outname, outpath, content_type='image/jpeg')
 
+                if not photo.media.keywords:
+                    photo.media.keywords = gdata.media.Keywords()
+                photo.media.keywords.text = str(0)
+                self.client.UpdatePhotoMetadata(photo)
+
+                addToDb(outname, 0, True)
+
         os.remove(outpath)
         return
 
     def on_deleted(self, event):
         print 'File deleted', event.src_path
         if os.path.isfile(event.src_path):
-            photoname = convertPath(event.src_path) + '.jpg'
+            photoname = convertPath(event.src_path) + '.png'
 
             albums = self.client.GetUserFeed()
             for album in albums.entry:
@@ -82,6 +96,7 @@ class StenoDriveHandler(FileSystemEventHandler):
                     for photo in photos.entry:
                         if photo.title.text == photoname:
                             self.client.Delete(photo)
+                            delFromDb(photoname)
                             return
 
         else:
@@ -104,7 +119,7 @@ class StenoDriveHandler(FileSystemEventHandler):
         if os.path.isdir(event.src_path) or event.src_path.endswith('.DS_Store'):
             return
 
-        photoname = convertPath(event.src_path) + '.jpg'
+        photoname = convertPath(event.src_path) + '.png'
         outpath = os.path.join(tempName, photoname)
         encode(event.src_path, outpath)
 
@@ -120,6 +135,15 @@ class StenoDriveHandler(FileSystemEventHandler):
                         break
 
                 photo = self.client.InsertPhotoSimple(album_url, photoname, 'StenoDrive: ' + photoname, outpath, content_type='image/jpeg')
+
+                rev = getFromDb(photoname)
+                addToDb(photoname, rev + 1, False)
+
+                if not photo.media.keywords:
+                    photo.media.keywords = gdata.media.Keywords()
+                photo.media.keywords.text = str(rev + 1)
+                self.client.UpdatePhotoMetadata(photo)
+
                 break
 
         os.remove(outpath)
@@ -127,8 +151,8 @@ class StenoDriveHandler(FileSystemEventHandler):
 
     def on_moved(self, event):
         print 'File moved', event.src_path, event.dest_path
-        oldname = convertPath(event.src_path) + '.jpg'
-        newname = convertPath(event.dest_path) + '.jpg'
+        oldname = convertPath(event.src_path) + '.png'
+        newname = convertPath(event.dest_path) + '.png'
 
         albums = self.client.GetUserFeed()
         for album in albums.entry:
@@ -190,6 +214,52 @@ def doesAlbumExist(client, albumName):
         if album.title.text == albumName:
             return True
     return False
+
+def initDb():
+    if not os.path.exists(dbName):
+        with open(dbName, 'w') as data_file:
+            json.dump({}, data_file)
+        return True
+    return False
+
+def addToDb(key, val, existsCheck):
+    with open(dbName, 'w+') as data_file:
+        try:
+            data = json.load(data_file)
+        except ValueError:
+            data = {}
+
+        if existsCheck:
+            if key not in data:
+                data[key] = val
+        else:
+            data[key] = val
+
+        json.dump(data, data_file)
+
+def delFromDb(key):
+    with open(dbName, 'w+') as data_file:
+        try:
+            data = json.load(data_file)
+        except ValueError:
+            data = {}
+
+        if key in data:
+            del data[key]
+
+        json.dump(data, data_file)
+
+def getFromDb(key):
+    with open(dbName, 'w+') as data_file:
+        try:
+            data = json.load(data_file)
+        except ValueError:
+            data = {}
+
+        if key in data:
+            return data[key]
+
+        return -1
 
 
 
@@ -329,6 +399,72 @@ def save_file(byte_array, output):
 
 
 ####################
+# Jank
+####################
+
+def getZipUrl():
+    driver = webdriver.Firefox()
+    driver.get("https://photos.google.com/login")
+    email = driver.find_element_by_id("Email")
+    email.send_keys(email)
+    email.send_keys(Keys.RETURN)
+    try:
+        passwd = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "Passwd"))
+            )
+    finally:
+        passwd = driver.find_element_by_id("Passwd")
+        passwd.send_keys(password)
+        passwd.send_keys(Keys.RETURN)
+
+    try:
+        on_page = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "aria-label-appbar-title"))
+            )
+    finally:
+        driver.get("https://photos.google.com/collections")
+        time.sleep(1)
+
+    try:
+        loaded_collections = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "_ij"))
+        )
+    finally:
+        src = driver.page_source
+        position = src.find("data:function(){return ")
+        position += len("data:function(){return ")
+
+        stack = [src[position]]
+        albums_source = "["
+
+        while len(stack) > 0:
+            position += 1
+            if src[position] == '[':
+                stack.append('[')
+            elif src[position] == ']':
+                stack.pop()
+            albums_source += src[position]
+
+        j = json.loads(albums_source)
+        j = j[0]
+        for album in j:
+            name = album[2].itervalues().next()[1]
+            if name == "StegoDrive-DoNotDelete":
+                driver.get("https://photos.google.com/album/" + album[0])
+                time.sleep(1)
+
+        src = driver.page_source
+        position = src.find("https://video.googleusercontent.com/")
+        position += len("https://video.googleusercontent.com/")
+        end_pos = src.find("\"", position)
+
+        zip_url = "https://video.googleusercontent.com/" + src[position:end_pos]
+        driver.quit()
+        return zip_url
+
+
+
+####################
 # MAIN LOOP
 ####################
 
@@ -351,6 +487,11 @@ if __name__ == '__main__':
     if not didMakeAlbum:
         print 'Album already exists! Did not create a new one'
 
+    print 'Initializing JSON database...'
+    didMakeJson = initDb()
+    if not didMakeJson:
+        print 'DB already exists! Did not create a new one'
+
     syncFolders(client)
 
     try:
@@ -359,3 +500,6 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
+
+    #filename = 'files#sexy.jpg#.png'
+    #decode(filename, 'sexyout.jpg')

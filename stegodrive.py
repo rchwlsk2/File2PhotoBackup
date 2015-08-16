@@ -489,7 +489,13 @@ def resolveEncodedFiles():
         longpath = devertPath(filename)
         filename = os.path.join(tempName, filename)
 
+        builtpath = None
         for directory in longpath[:-1]:
+            if builtpath is None:
+                builtpath = directory
+            else:
+                builtpath = os.path.join(builtpath, directory)
+
             if not os.path.exists(directory):
                 os.makedirs(directory)
 

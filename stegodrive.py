@@ -101,7 +101,7 @@ class StenoDriveHandler(FileSystemEventHandler):
                             delFromDb(photoname)
                             return
 
-        else: 
+        else:
             photostart = convertPath(event.src_path)
 
             albums = self.client.GetUserFeed()
@@ -315,7 +315,7 @@ def upSync(client, photo, rev):
     tempPath = os.path.join(tempName, sourceFile[-1])
     encode('/'.join(sourceFile), tempPath)
 
-    albums = self.client.GetUserFeed()
+    albums = client.GetUserFeed()
     for album in albums.entry:
         if album.title.text == albumName:
             album_url = '/data/feed/api/user/default/albumid/%s' % album.gphoto_id.text
@@ -328,7 +328,7 @@ def upSync(client, photo, rev):
 
     os.remove(tempPath)
     return
-    
+
 
 #####################
 # FILE MANAGEMENT

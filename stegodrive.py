@@ -472,6 +472,9 @@ if __name__ == '__main__':
     if len(sys.argv) != 3:
         sys.exit("Usage: python stegodrive.py <email> <password>")
 
+    if not os.path.exists(tempName):
+        os.makedirs(tempName)
+
     email = sys.argv[1]
     password = sys.argv[2]
 
@@ -479,6 +482,8 @@ if __name__ == '__main__':
     event_handler = StenoDriveHandler(client)
     observer = Observer()
 
+    if not os.path.exists(folderName):
+        os.makedirs(folderName)
     observer.schedule(event_handler, path=folderName, recursive=True)
     observer.start()
 
@@ -486,14 +491,19 @@ if __name__ == '__main__':
     didMakeAlbum = initializeAlbum(client)
     if not didMakeAlbum:
         print 'Album already exists! Did not create a new one'
+    else:
+        print 'Album created :)'
 
     print 'Initializing JSON database...'
     didMakeJson = initDb()
     if not didMakeJson:
         print 'DB already exists! Did not create a new one'
+    else:
+        print 'DB created :)'
 
     syncFolders(client)
 
+    print "Observing for file changes"
     try:
         while True:
             time.sleep(1)

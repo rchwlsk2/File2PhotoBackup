@@ -607,6 +607,3 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
-
-    #filename = 'files#sexy.jpg#.png'
-    #decode(filename, 'sexyout.jpg')
